@@ -98,12 +98,41 @@ public class PongActorTest {
                    return "default";
                 });
 
-        cs.thenAccept(x -> System.out.println("Recovery: " + x));
-
-        Thread.sleep(100);
+        System.out.println("Recovery: " + cs.get(1000, TimeUnit.MILLISECONDS));
     }
 
-    // TODO Recovering from failure asynchronously
+    @Test
+    public void recoverErrorAsync() throws Exception {
+        CompletableFuture<String> cs = this.askPong("cause error").
+                handle((pong, ex) -> ex == null ? CompletableFuture.completedFuture(pong) : this.askPong("Ping")).
+                thenCompose(x -> x);
+
+        System.out.println("Recovery async: " + cs.get(1000, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void combineAndHandleError() throws Exception {
+        CompletableFuture<String> cs = this.askPong("Ping").
+                thenCompose(x -> this.askPong("Ping" + x)).
+                handle((x, ex) -> {
+                   return ex != null ? "default" : x;
+                });
+
+        System.out.println("Combine and handle error: " + cs.get(1000, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void combineMany() throws Exception {
+        CompletableFuture<String> cs = this.askPong("Ping").
+                thenCombine(this.askPong("Ping"), (a, b) -> {
+                    return a + b;
+                }).
+                thenCombine(this.askPong("Ping"), (a, b) -> {
+                    return a + b;
+                });
+
+        System.out.println("Combine many: " + cs.get(1000, TimeUnit.MILLISECONDS));
+    }
 
     public CompletableFuture<String> askPong(String message) {
         Future sFuture = ask(this.actorRef, message, 1000);
